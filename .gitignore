@@ -1,0 +1,12 @@
+# Generated Windows executables
+*.exe
+*.exe~
+
+# Local task and timer data (may contain personal information)
+/data/*.json
+!/data/.gitkeep
+
+# Local editor and Windows metadata
+/.vscode/
+/desktop.ini
+/templates/indexold.html

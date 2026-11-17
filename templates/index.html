@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <title>Todo List</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 20px;
+        }
+        h1 { color: #333; margin-bottom: 20px; }
+        h2 { color: #667eea; margin: 20px 0 10px 0; }
+        .task-list { list-style: none; }
+        .task-item {
+            background: #f8f9fa;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .task-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .task-details {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .task-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .timer-panel { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px; padding: 12px 16px; margin: 16px 0; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+        .timer-controls { margin-top: 10px; }
+        .timer-button { background:#198754; color:white; padding:8px 12px; }
+        .timer-button.stop { background:#dc3545; }
+        .timer-button:disabled { background:#888; cursor:not-allowed; }
+        .timer-clock { font-family:monospace; font-size:1.2em; font-weight:bold; }
+        button {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .btn-add {
+            background: #28a745;
+            color: white;
+            padding: 10px 20px;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            max-width: 500px;
+            margin: 100px auto;
+        }
+        .close {
+            float: right;
+            cursor: pointer;
+            font-size: 24px;
+        }
+        .note-section {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background: #fff3cd;
+            border-radius: 5px;
+        }
+        .nav-links {
+            margin-bottom: 20px;
+        }
+        .nav-links a {
+            display: inline-block;
+            margin-right: 10px;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+        .nav-links a:hover { background: #764ba2; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-links">
+            <a href="/"><i class="bi bi-list-task" aria-hidden="true"></i> Todo List</a>
+            <a href="/calendar-view"><i class="bi bi-calendar3" aria-hidden="true"></i> Calendrier</a>
+        </div>
+
+        <h1><i class="bi bi-list-task" aria-hidden="true"></i> Ma Todo List</h1>
+        {{if .ActiveTimer}}
+        <div class="timer-panel" id="activeTimer" data-task-id="{{.ActiveTimer.TaskID}}" data-start-ms="{{.ActiveTimer.StartedAt.UnixMilli}}">
+            <div>Chronomètre en cours sur <strong>{{.ActiveTimerTaskTitle}}</strong> · <span id="timerElapsed" class="timer-clock">00:00:00</span></div>
+            <button type="button" class="timer-button stop" onclick="stopTimer()"><i class="bi bi-stop-fill" aria-hidden="true"></i> Arrêter et enregistrer</button>
+        </div>
+        {{end}}
+
+        <form action="/add" method="POST" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <h3>Ajouter une tâche</h3>
+            <div class="form-group">
+                <label>Titre:</label>
+                <input type="text" name="title" required>
+            </div>
+            <div class="form-group">
+                <label>Date limite:</label>
+                <input type="date" name="deadline" required>
+            </div>
+            <div class="form-group">
+                <label>Importance (1-10):</label>
+                <input type="number" name="importance" min="1" max="10" value="5">
+            </div>
+            <button type="submit" class="btn-add"><i class="bi bi-plus-lg" aria-hidden="true"></i> Ajouter</button>
+        </form>
+
+        <h2><i class="bi bi-calendar-check" aria-hidden="true"></i> À faire aujourd'hui</h2>
+        <div class="task-list">
+            {{range .Today}}
+            <div class="task-item">
+                <div class="task-title">{{.Title}}</div>
+                <div class="task-details">
+                    <i class="bi bi-calendar3" aria-hidden="true"></i> {{.Deadline.Format "02/01/2006"}} <span aria-hidden="true">·</span> <i class="bi bi-flag-fill" aria-hidden="true"></i> Importance: {{.Importance}}/10 <span aria-hidden="true">·</span> <i class="bi bi-clock" aria-hidden="true"></i> <span class="work-total" data-task-id="{{.ID}}" data-base-minutes="{{.WorkMinutes}}" data-base-seconds="{{.WorkSeconds}}">{{formatDuration .WorkMinutes .WorkSeconds}}</span>
+                </div>
+                <div class="task-actions">
+                    <form action="/update" method="POST" style="display: inline;">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <input type="hidden" name="action" value="+">
+                        <button type="submit" style="background:#28a745;color:white;">+20 min</button>
+                    </form>
+                    <form action="/update" method="POST" style="display: inline;">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <input type="hidden" name="action" value="-">
+                        <button type="submit" style="background:#dc3545;color:white;">-20 min</button>
+                    </form>
+                    <button aria-label="Modifier la tâche" title="Modifier la tâche" onclick="openEdit({{.ID}}, '{{.Title}}', '{{.Deadline.Format "2006-01-02"}}', {{.Importance}})" style="background:#17a2b8;color:white;"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                    <form action="/delete" method="POST" style="display: inline;">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <button type="submit" aria-label="Supprimer la tâche" title="Supprimer la tâche" style="background:#dc3545;color:white;"><i class="bi bi-trash3" aria-hidden="true"></i></button>
+                    </form>
+                    <button onclick="toggleNote({{.ID}})" style="background:#6f42c1;color:white;"><i class="bi bi-sticky" aria-hidden="true"></i> Note</button>
+                </div>
+                <div class="timer-controls">
+                    {{if $.ActiveTimer}}{{if eq $.ActiveTimer.TaskID .ID}}<button type="button" class="timer-button stop" onclick="stopTimer()"><i class="bi bi-stop-fill" aria-hidden="true"></i> Arrêter le chrono</button>{{else}}<button type="button" class="timer-button" disabled><i class="bi bi-lock-fill" aria-hidden="true"></i> Chrono actif sur {{$.ActiveTimerTaskTitle}}</button>{{end}}{{else}}<button type="button" class="timer-button" onclick="startTimer({{.ID}})"><i class="bi bi-play-fill" aria-hidden="true"></i> Commencer à compter</button>{{end}}
+                </div>
+                <div id="note-{{.ID}}" class="note-section">
+                    <strong>Note:</strong>
+                    <p>{{.Note}}</p>
+                    <button onclick="addNote({{.ID}})" style="background:#20c997;color:white; margin-top:5px;"><i class="bi bi-pencil-square" aria-hidden="true"></i> Ajouter/Modifier</button>
+                </div>
+            </div>
+            {{else}}
+            <p>Aucune tâche pour aujourd'hui</p>
+            {{end}}
+        </div>
+
+        <h2><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Tâches en retard</h2>
+        <div class="task-list">
+            {{range .Late}}
+            <div class="task-item">
+                <div class="task-title">{{.Title}}</div>
+                <div class="task-details">
+                    <i class="bi bi-calendar3" aria-hidden="true"></i> {{.Deadline.Format "02/01/2006"}} <span aria-hidden="true">·</span> <i class="bi bi-flag-fill" aria-hidden="true"></i> Importance: {{.Importance}}/10 <span aria-hidden="true">·</span> <i class="bi bi-clock" aria-hidden="true"></i> <span class="work-total" data-task-id="{{.ID}}" data-base-minutes="{{.WorkMinutes}}" data-base-seconds="{{.WorkSeconds}}">{{formatDuration .WorkMinutes .WorkSeconds}}</span>
+                </div>
+                <div class="task-actions">
+                    <form action="/update" method="POST" style="display: inline;">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <input type="hidden" name="action" value="+">
+                        <button type="submit" style="background:#28a745;color:white;">+20 min</button>
+                    </form>
+                    <form action="/update" method="POST" style="display: inline;">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <input type="hidden" name="action" value="-">
+                        <button type="submit" style="background:#dc3545;color:white;">-20 min</button>
+                    </form>
+                    <form action="/set-today" method="POST" style="display: inline;">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <button type="submit" style="background:#ffc107;color:#333;"><i class="bi bi-calendar-plus" aria-hidden="true"></i> Planifier aujourd'hui</button>
+                    </form>
+                    <button aria-label="Modifier la tâche" title="Modifier la tâche" onclick="openEdit({{.ID}}, '{{.Title}}', '{{.Deadline.Format "2006-01-02"}}', {{.Importance}})" style="background:#17a2b8;color:white;"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                    <form action="/delete" method="POST" style="display: inline;">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <button type="submit" aria-label="Supprimer la tâche" title="Supprimer la tâche" style="background:#dc3545;color:white;"><i class="bi bi-trash3" aria-hidden="true"></i></button>
+                    </form>
+                    <button onclick="toggleNote({{.ID}})" style="background:#6f42c1;color:white;"><i class="bi bi-sticky" aria-hidden="true"></i> Note</button>
+                </div>
+                <div class="timer-controls">
+                    {{if $.ActiveTimer}}{{if eq $.ActiveTimer.TaskID .ID}}<button type="button" class="timer-button stop" onclick="stopTimer()"><i class="bi bi-stop-fill" aria-hidden="true"></i> Arrêter le chrono</button>{{else}}<button type="button" class="timer-button" disabled><i class="bi bi-lock-fill" aria-hidden="true"></i> Chrono actif sur {{$.ActiveTimerTaskTitle}}</button>{{end}}{{else}}<button type="button" class="timer-button" onclick="startTimer({{.ID}})"><i class="bi bi-play-fill" aria-hidden="true"></i> Commencer à compter</button>{{end}}
+                </div>
+                <div id="note-{{.ID}}" class="note-section">
+                    <strong>Note:</strong>
+                    <p>{{.Note}}</p>
+                    <button onclick="addNote({{.ID}})" style="background:#20c997;color:white; margin-top:5px;"><i class="bi bi-pencil-square" aria-hidden="true"></i> Ajouter/Modifier</button>
+                </div>
+            </div>
+            {{else}}
+            <p>Aucune tâche en retard</p>
+            {{end}}
+        </div>
+
+        <h2><i class="bi bi-list-check" aria-hidden="true"></i> Autres tâches</h2>
+        <div class="task-list">
+            {{range .General}}
+            <div class="task-item">
+                <div class="task-title">{{.Title}}</div>
+                <div class="task-details">
+                    <i class="bi bi-calendar3" aria-hidden="true"></i> {{.Deadline.Format "02/01/2006"}} <span aria-hidden="true">·</span> <i class="bi bi-flag-fill" aria-hidden="true"></i> Importance: {{.Importance}}/10 <span aria-hidden="true">·</span> <i class="bi bi-clock" aria-hidden="true"></i> <span class="work-total" data-task-id="{{.ID}}" data-base-minutes="{{.WorkMinutes}}" data-base-seconds="{{.WorkSeconds}}">{{formatDuration .WorkMinutes .WorkSeconds}}</span>
+                </div>
+                <div class="task-actions">
+                    <form action="/update" method="POST" style="display: inline;">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <input type="hidden" name="action" value="+">
+                        <button type="submit" style="background:#28a745;color:white;">+20 min</button>
+                    </form>
+                    <form action="/update" method="POST" style="display: inline;">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <input type="hidden" name="action" value="-">
+                        <button type="submit" style="background:#dc3545;color:white;">-20 min</button>
+                    </form>
+                    <form action="/set-today" method="POST" style="display: inline;">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <button type="submit" style="background:#ffc107;color:#333;"><i class="bi bi-calendar-plus" aria-hidden="true"></i> Planifier aujourd'hui</button>
+                    </form>
+                    <button aria-label="Modifier la tâche" title="Modifier la tâche" onclick="openEdit({{.ID}}, '{{.Title}}', '{{.Deadline.Format "2006-01-02"}}', {{.Importance}})" style="background:#17a2b8;color:white;"><i class="bi bi-pencil" aria-hidden="true"></i></button>
+                    <form action="/delete" method="POST" style="display: inline;">
+                        <input type="hidden" name="id" value="{{.ID}}">
+                        <button type="submit" aria-label="Supprimer la tâche" title="Supprimer la tâche" style="background:#dc3545;color:white;"><i class="bi bi-trash3" aria-hidden="true"></i></button>
+                    </form>
+                    <button onclick="toggleNote({{.ID}})" style="background:#6f42c1;color:white;"><i class="bi bi-sticky" aria-hidden="true"></i> Note</button>
+                </div>
+                <div class="timer-controls">
+                    {{if $.ActiveTimer}}{{if eq $.ActiveTimer.TaskID .ID}}<button type="button" class="timer-button stop" onclick="stopTimer()"><i class="bi bi-stop-fill" aria-hidden="true"></i> Arrêter le chrono</button>{{else}}<button type="button" class="timer-button" disabled><i class="bi bi-lock-fill" aria-hidden="true"></i> Chrono actif sur {{$.ActiveTimerTaskTitle}}</button>{{end}}{{else}}<button type="button" class="timer-button" onclick="startTimer({{.ID}})"><i class="bi bi-play-fill" aria-hidden="true"></i> Commencer à compter</button>{{end}}
+                </div>
+                <div id="note-{{.ID}}" class="note-section">
+                    <strong>Note:</strong>
+                    <p>{{.Note}}</p>
+                    <button onclick="addNote({{.ID}})" style="background:#20c997;color:white; margin-top:5px;"><i class="bi bi-pencil-square" aria-hidden="true"></i> Ajouter/Modifier</button>
+                </div>
+            </div>
+            {{else}}
+            <p>Aucune autre tâche</p>
+            {{end}}
+        </div>
+    </div>
+
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEdit()">&times;</span>
+            <h3><i class="bi bi-pencil-square" aria-hidden="true"></i> Modifier la tâche</h3>
+            <form action="/edit" method="POST">
+                <input type="hidden" name="id" id="editId">
+                <div class="form-group">
+                    <label>Titre:</label>
+                    <input type="text" name="title" id="editTitle" required>
+                </div>
+                <div class="form-group">
+                    <label>Date limite:</label>
+                    <input type="date" name="deadline" id="editDeadline" required>
+                </div>
+                <div class="form-group">
+                    <label>Importance (1-10):</label>
+                    <input type="number" name="importance" id="editImportance" min="1" max="10">
+                </div>
+                <button type="submit" style="background:#28a745;color:white;">💾 Enregistrer</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="noteModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeNoteModal()">&times;</span>
+            <h3><i class="bi bi-sticky" aria-hidden="true"></i> Ajouter une note</h3>
+            <input type="hidden" id="noteTaskId">
+            <div class="form-group">
+                <label>Note:</label>
+                <textarea id="noteText" rows="5" style="width:100%; padding:8px;"></textarea>
+            </div>
+            <button onclick="saveNote()" style="background:#28a745;color:white;">💾 Sauvegarder</button>
+        </div>
+    </div>
+        <script>
+        function openEdit(id, title, deadline, importance) {
+            document.getElementById('editId').value = id;
+            document.getElementById('editTitle').value = title;
+            document.getElementById('editDeadline').value = deadline;
+            document.getElementById('editImportance').value = importance;
+            document.getElementById('editModal').style.display = 'block';
+        }
+
+        function closeEdit() {
+            document.getElementById('editModal').style.display = 'none';
+        }
+
+        function toggleNote(id) {
+            const noteDiv = document.getElementById('note-' + id);
+            if (noteDiv) {
+                if (noteDiv.style.display === 'none' || noteDiv.style.display === '') {
+                    noteDiv.style.display = 'block';
+                } else {
+                    noteDiv.style.display = 'none';
+                }
+            } else {
+                console.log('Note div not found for id:', id);
+            }
+        }
+
+        function addNote(id) {
+            document.getElementById('noteTaskId').value = id;
+            document.getElementById('noteText').value = '';
+            document.getElementById('noteModal').style.display = 'block';
+        }
+
+        function closeNoteModal() {
+            document.getElementById('noteModal').style.display = 'none';
+        }
+
+        function saveNote() {
+            const id = document.getElementById('noteTaskId').value;
+            const note = document.getElementById('noteText').value;
+
+            fetch('/note', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'id=' + id + '&note=' + encodeURIComponent(note)
+            }).then(response => {
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Erreur lors de la sauvegarde');
+                }
+            }).catch(error => {
+                console.error('Error:', error);
+                alert('Erreur réseau');
+            });
+        }
+
+        function deleteTask(id) {
+            if (confirm('Êtes-vous sûr de vouloir supprimer cette tâche ?')) {
+                fetch('/delete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'id=' + id
+                }).then(() => location.reload());
+            }
+        }
+
+        function updateTime(id, action) {
+            fetch('/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'id=' + id + '&action=' + action
+            }).then(() => location.reload());
+        }
+
+        function setToday(id) {
+            fetch('/set-today', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'id=' + id
+            }).then(() => location.reload());
+        }
+
+        function formatWorkTime(totalSeconds) {
+            const totalMinutes = Math.floor(totalSeconds / 60);
+            if (totalMinutes < 60) return `${totalMinutes} min`;
+            return `${Math.floor(totalMinutes / 60)} h ${totalMinutes % 60} min`;
+        }
+
+        function updateTimerDisplay() {
+            const panel = document.getElementById('activeTimer');
+            if (!panel) return;
+            const elapsed = Math.max(0, Math.floor((Date.now() - Number(panel.dataset.startMs)) / 1000));
+            const hours = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+            const minutes = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+            const seconds = String(elapsed % 60).padStart(2, '0');
+            document.getElementById('timerElapsed').textContent = `${hours}:${minutes}:${seconds}`;
+            document.querySelectorAll(`.work-total[data-task-id="${panel.dataset.taskId}"]`).forEach(node => {
+                const base = Number(node.dataset.baseMinutes) * 60 + Number(node.dataset.baseSeconds);
+                node.textContent = formatWorkTime(base + elapsed);
+            });
+        }
+        updateTimerDisplay();
+        setInterval(updateTimerDisplay, 1000);
+
+        async function startTimer(id) {
+            const response = await fetch('/timer/start', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'id=' + encodeURIComponent(id)});
+            const result = await response.json();
+            if (!response.ok) { alert(result.message); return; }
+            location.reload();
+        }
+
+        async function stopTimer() {
+            const response = await fetch('/timer/stop', {method:'POST'});
+            const result = await response.json();
+            if (!response.ok) { alert(result.message); return; }
+            location.reload();
+        }
+
+        window.onclick = function(event) {
+            if (event.target === document.getElementById('editModal')) {
+                closeEdit();
+            }
+            if (event.target === document.getElementById('noteModal')) {
+                closeNoteModal();
+            }
+        }
+    </script>
+</body>
+</html>
