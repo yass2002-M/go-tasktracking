@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -84,6 +85,9 @@ func main() {
 	http.HandleFunc("/delete", deleteHandler)
 	http.HandleFunc("/edit", editHandler)
 	http.HandleFunc("/set-today", setTodayHandler)
+	http.HandleFunc("/subtask/add", addSubtaskHandler)
+	http.HandleFunc("/subtask/toggle", toggleSubtaskHandler)
+	http.HandleFunc("/subtask/delete", deleteSubtaskHandler)
 
 	http.HandleFunc("/calendar-view", calendarViewController)
 
@@ -403,6 +407,73 @@ func noteHandler(w http.ResponseWriter, r *http.Request) {
 	for i := range tasks {
 		if tasks[i].ID == id {
 			tasks[i].Note = note
+			break
+		}
+	}
+	saveTasks(tasks)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func addSubtaskHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	_ = r.ParseForm()
+	taskID, _ := strconv.Atoi(r.FormValue("task_id"))
+	title := strings.TrimSpace(r.FormValue("title"))
+	if title != "" {
+		tasks := loadTasks()
+		for i := range tasks {
+			if tasks[i].ID == taskID {
+				maxID := 0
+				for _, subtask := range tasks[i].Subtasks {
+					if subtask.ID > maxID {
+						maxID = subtask.ID
+					}
+				}
+				tasks[i].Subtasks = append(tasks[i].Subtasks, models.Subtask{ID: maxID + 1, Title: title})
+				break
+			}
+		}
+		saveTasks(tasks)
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func toggleSubtaskHandler(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	taskID, _ := strconv.Atoi(r.FormValue("task_id"))
+	subtaskID, _ := strconv.Atoi(r.FormValue("subtask_id"))
+	tasks := loadTasks()
+	for i := range tasks {
+		if tasks[i].ID == taskID {
+			for j := range tasks[i].Subtasks {
+				if tasks[i].Subtasks[j].ID == subtaskID {
+					tasks[i].Subtasks[j].Done = !tasks[i].Subtasks[j].Done
+					break
+				}
+			}
+			break
+		}
+	}
+	saveTasks(tasks)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func deleteSubtaskHandler(w http.ResponseWriter, r *http.Request) {
+	_ = r.ParseForm()
+	taskID, _ := strconv.Atoi(r.FormValue("task_id"))
+	subtaskID, _ := strconv.Atoi(r.FormValue("subtask_id"))
+	tasks := loadTasks()
+	for i := range tasks {
+		if tasks[i].ID == taskID {
+			for j := range tasks[i].Subtasks {
+				if tasks[i].Subtasks[j].ID == subtaskID {
+					tasks[i].Subtasks = append(tasks[i].Subtasks[:j], tasks[i].Subtasks[j+1:]...)
+					break
+				}
+			}
 			break
 		}
 	}

@@ -11,6 +11,7 @@ Application personnelle de gestion des tâches, écrite en Go. Elle permet de su
 - Suivi du temps par tâche avec un chronomètre : une seule tâche peut être chronométrée à la fois.
 - Le chronomètre continue de mesurer le temps si le serveur est redémarré. Le temps est ajouté au total de la tâche à l'arrêt.
 - Ajustement manuel du temps par incréments de 20 minutes.
+- Checklist de sous-taches pour chaque tache : ajout, suppression et coche/décoche des éléments.
 - Sauvegarde locale des données au format JSON.
 
 ## Démarrage rapide sous Windows

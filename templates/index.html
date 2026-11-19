@@ -47,6 +47,17 @@
             margin-top: 10px;
             flex-wrap: wrap;
         }
+        .subtasks { margin: 12px 0 4px; padding: 12px; background: #fff; border: 1px solid #e5e7eb; border-radius: 7px; }
+        .subtasks summary { color: #444; font-weight: bold; cursor: pointer; }
+        .subtask-content { padding-top: 8px; }
+        .subtask-row { display:flex; align-items:center; gap:8px; padding:5px 0; }
+        .subtask-row form { margin:0; }
+        .subtask-row .subtask-title { flex:1; }
+        .subtask-row.done .subtask-title { color:#888; text-decoration:line-through; }
+        .subtask-delete { background:transparent; color:#dc3545; padding:3px 7px; }
+        .subtask-add { display:flex; gap:8px; margin-top:8px; }
+        .subtask-add input { flex:1; min-width:0; padding:8px; border:1px solid #ddd; border-radius:5px; }
+        .subtask-add button { background:#667eea; color:white; }
         .timer-panel { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px; padding: 12px 16px; margin: 16px 0; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
         .timer-controls { margin-top: 10px; }
         .timer-button { background:#198754; color:white; padding:8px 12px; }
@@ -162,6 +173,7 @@
                 <div class="task-details">
                     <i class="bi bi-calendar3" aria-hidden="true"></i> {{.Deadline.Format "02/01/2006"}} <span aria-hidden="true">·</span> <i class="bi bi-flag-fill" aria-hidden="true"></i> Importance: {{.Importance}}/10 <span aria-hidden="true">·</span> <i class="bi bi-clock" aria-hidden="true"></i> <span class="work-total" data-task-id="{{.ID}}" data-base-minutes="{{.WorkMinutes}}" data-base-seconds="{{.WorkSeconds}}">{{formatDuration .WorkMinutes .WorkSeconds}}</span>
                 </div>
+                {{template "subtasks" .}}
                 <div class="task-actions">
                     <form action="/update" method="POST" style="display: inline;">
                         <input type="hidden" name="id" value="{{.ID}}">
@@ -202,6 +214,7 @@
                 <div class="task-details">
                     <i class="bi bi-calendar3" aria-hidden="true"></i> {{.Deadline.Format "02/01/2006"}} <span aria-hidden="true">·</span> <i class="bi bi-flag-fill" aria-hidden="true"></i> Importance: {{.Importance}}/10 <span aria-hidden="true">·</span> <i class="bi bi-clock" aria-hidden="true"></i> <span class="work-total" data-task-id="{{.ID}}" data-base-minutes="{{.WorkMinutes}}" data-base-seconds="{{.WorkSeconds}}">{{formatDuration .WorkMinutes .WorkSeconds}}</span>
                 </div>
+                {{template "subtasks" .}}
                 <div class="task-actions">
                     <form action="/update" method="POST" style="display: inline;">
                         <input type="hidden" name="id" value="{{.ID}}">
@@ -246,6 +259,7 @@
                 <div class="task-details">
                     <i class="bi bi-calendar3" aria-hidden="true"></i> {{.Deadline.Format "02/01/2006"}} <span aria-hidden="true">·</span> <i class="bi bi-flag-fill" aria-hidden="true"></i> Importance: {{.Importance}}/10 <span aria-hidden="true">·</span> <i class="bi bi-clock" aria-hidden="true"></i> <span class="work-total" data-task-id="{{.ID}}" data-base-minutes="{{.WorkMinutes}}" data-base-seconds="{{.WorkSeconds}}">{{formatDuration .WorkMinutes .WorkSeconds}}</span>
                 </div>
+                {{template "subtasks" .}}
                 <div class="task-actions">
                     <form action="/update" method="POST" style="display: inline;">
                         <input type="hidden" name="id" value="{{.ID}}">
@@ -453,5 +467,36 @@
             }
         }
     </script>
+{{define "subtasks"}}
+<div class="subtasks">
+    <details>
+    <summary><i class="bi bi-list-check" aria-hidden="true"></i> Sous taches{{if .Subtasks}} ({{len .Subtasks}}){{end}}</summary>
+    <div class="subtask-content">
+    {{range .Subtasks}}
+    <div class="subtask-row {{if .Done}}done{{end}}">
+        <form action="/subtask/toggle" method="POST">
+            <input type="hidden" name="task_id" value="{{$.ID}}">
+            <input type="hidden" name="subtask_id" value="{{.ID}}">
+            <input type="checkbox" aria-label="{{if .Done}}Marquer comme a faire{{else}}Marquer comme terminee{{end}}" {{if .Done}}checked{{end}} onchange="this.form.submit()">
+        </form>
+        <span class="subtask-title">{{.Title}}</span>
+        <form action="/subtask/delete" method="POST">
+            <input type="hidden" name="task_id" value="{{$.ID}}">
+            <input type="hidden" name="subtask_id" value="{{.ID}}">
+            <button type="submit" class="subtask-delete" aria-label="Supprimer cette sous-tache" title="Supprimer"><i class="bi bi-trash3" aria-hidden="true"></i></button>
+        </form>
+    </div>
+    {{else}}
+    <p style="color:#777;font-size:14px;">Aucune sous-tache pour le moment.</p>
+    {{end}}
+    <form action="/subtask/add" method="POST" class="subtask-add">
+        <input type="hidden" name="task_id" value="{{.ID}}">
+        <input type="text" name="title" placeholder="Ex. Variables, fonctions..." aria-label="Nouvelle sous-tache" required>
+        <button type="submit" aria-label="Ajouter une sous-tache" title="Ajouter"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+    </form>
+    </div>
+    </details>
+</div>
+{{end}}
 </body>
 </html>
